@@ -4,6 +4,58 @@ import Notification from "../model/notification.js";
 import Project from "../model/project.js";
 import Task from "../model/task.js";
 
+
+
+// Create Project
+export const createProject = async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Project name is required" });
+    }
+
+    const project = await Project.create({ name });
+
+    res.status(201).json({ message: "Project created successfully", project });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to create project" });
+  }
+};
+
+// Create Task
+export const createTask = async (req, res) => {
+  try {
+    const { name, assignedTo, dueDate, projectId } = req.body;
+
+    // Validate required fields
+    if (!name || !assignedTo || !projectId) {
+      return res.status(400).json({ error: "Task name, assignedTo and ProjectId are required" });
+    }
+
+        // Check if project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    // Create the task
+    const task = await Task.create({
+      name,
+      assignedTo,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      project: projectId
+    });
+
+    res.status(201).json({ message: "Task created successfully", task });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to create task" });
+  }
+};
+
+
 // Project Completed
 export const projectCompleted = async (req, res) => {
   try {
@@ -29,9 +81,10 @@ export const projectCompleted = async (req, res) => {
 
     res.json({ message: "Project completion notification sent" });
   } catch (error) {
-    res.status(500).json({ error: "Failed to send project completion email" });
-  }
-};
+  console.error("Project Completed Error:", error);  // 👈 Add this
+  res.status(500).json({ error: error.message || "Failed to send project completion email" });
+}
+}
 
 // Task Moved
 export const taskMoved = async (req, res) => {

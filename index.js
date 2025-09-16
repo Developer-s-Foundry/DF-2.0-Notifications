@@ -1,6 +1,9 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import cors from 'cors';
 import notificationRouter from './route/notificaton.js';
+
+await mongoose.connect(process.env.MONGO_URL)
 
 const app = express();
 
