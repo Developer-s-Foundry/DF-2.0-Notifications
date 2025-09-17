@@ -142,3 +142,18 @@ export const taskExpired = async (req, res) => {
     res.status(500).json({ error: "Failed to send task expired email" });
   }
 };
+
+export const openedNotification = async (req, res) => {
+  try {
+    const { notificationId } = req.body;
+    const notification = await Notification.findById(notificationId);
+    if (!notification) return res.status(404).json({ error: "Notification not found" });
+
+    notification.openedAt = new Date();
+    await notification.save();
+
+    res.json({ message: "Notification opened" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to open notification" });
+  }
+};
