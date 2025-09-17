@@ -6,6 +6,7 @@ import Task from "../model/task.js";
 
 
 
+
 // Create Project
 export const createProject = async (req, res) => {
   try {
@@ -72,14 +73,14 @@ export const projectCompleted = async (req, res) => {
 
     await sendEmail(recipient, subject, html);
 
-    await Notification.create({
+    const notification = await Notification.create({
       type: "project_completed",
       recipient,
       subject,
       message: `Project ${project.name} has been completed.`
     });
 
-    res.json({ message: "Project completion notification sent" });
+    res.json({ message: "Project completion notification sent", project,notification});
   } catch (error) {
   console.error("Project Completed Error:", error);  // 👈 Add this
   res.status(500).json({ error: error.message || "Failed to send project completion email" });
@@ -102,14 +103,14 @@ export const taskMoved = async (req, res) => {
 
     await sendEmail(recipient, subject, html);
 
-    await Notification.create({
+    const notification = await Notification.create({
       type: "task_moved",
       recipient,
       subject,
       message: `Task ${task.name} moved from ${fromStage} → ${toStage}.`
     });
 
-    res.json({ message: "Task moved notification sent" });
+    res.json({ message: "Task moved notification sent", task, notification });
   } catch (error) {
     res.status(500).json({ error: "Failed to send task moved email" });
   }
@@ -130,14 +131,14 @@ export const taskExpired = async (req, res) => {
 
     await sendEmail(recipient, subject, html);
 
-    await Notification.create({
+    const notification = await Notification.create({
       type: "task_expired",
       recipient,
       subject,
       message: `Task ${task.name} expired on ${task.dueDate}.`
     });
 
-    res.json({ message: "Task expired notification sent" });
+    res.json({ message: "Task expired notification sent", task, notification });
   } catch (error) {
     res.status(500).json({ error: "Failed to send task expired email" });
   }
@@ -147,13 +148,84 @@ export const openedNotification = async (req, res) => {
   try {
     const { notificationId } = req.body;
     const notification = await Notification.findById(notificationId);
-    if (!notification) return res.status(404).json({ error: "Notification not found" });
 
-    notification.openedAt = new Date();
-    await notification.save();
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
 
-    res.json({ message: "Notification opened" });
+    // If not read → mark as read now
+    if (!notification.isRead) {
+      notification.isRead = true;
+      notification.openedAt = new Date();
+      await notification.save();
+
+      return res.json({
+        message: "Notification opened",
+        isRead: notification.isRead,
+        openedAt: notification.openedAt
+      });
+    }
+
+    // Already read
+    res.json({
+      message: "Notification already opened",
+      isRead: notification.isRead,
+      openedAt: notification.openedAt
+    });
+
   } catch (error) {
+    console.error("Open Notification Error:", error);
     res.status(500).json({ error: "Failed to open notification" });
+  }
+};
+
+// Mark notification as read when email is opened
+export const trackNotificationOpen = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const notification = await Notification.findById(id);
+
+    if (notification && !notification.isRead) {
+      notification.isRead = true;
+      notification.openedAt = new Date();
+      await notification.save();
+    }
+
+    // Return a 1x1 transparent pixel so email clients don’t block it
+    const pixel = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAoMBg8XrV0oAAAAASUVORK5CYII=",
+      "base64"
+    );
+    res.writeHead(200, {
+      "Content-Type": "image/png",
+      "Content-Length": pixel.length,
+    });
+    res.end(pixel);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to track notification" });
+  }
+};
+
+
+
+export const checkNotificationStatus = async (req, res) => {
+  try {
+    const { notificationId } = req.body;
+    const notification = await Notification.findById(notificationId);
+
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    res.json({
+      message: notification.isRead ? "Notification has been read" : "Notification is unread",
+      isRead: notification.isRead,
+      openedAt: notification.openedAt || null
+    });
+
+  } catch (error) {
+    console.error("Check Notification Status Error:", error);
+    res.status(500).json({ error: "Failed to fetch notification status" });
   }
 };
